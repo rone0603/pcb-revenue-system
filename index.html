@@ -71,26 +71,23 @@
 </div>
 
 <script>
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/1i1EckrHnN_tpe9h4lCHHNmP1InDK3RG_NwuoSlP18A4/gviz/tq?tqx=out:csv&gid=705831233';
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/1m1IYE4kHPEmbamOlUIUjgPzRzzNMkqBLY60jH41kaoA/gviz/tq?tqx=out:csv&gid=1124990978';
     
     let longFormatData = []; 
-    let categoryMap = {}; // 儲存 { 'PCB': ['臻鼎', '欣興'], '設備': [...] }
+    let categoryMap = {}; 
     let myChart = null;      
 
-    // 取得前一個月的字串 (計算 MoM 用)
     function getPrevMonth(dateStr) {
         let [y, m] = dateStr.split('-');
         let d = new Date(y, m - 1 - 1, 1);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
 
-    // 取得去年的字串 (計算 YoY 用)
     function getPrevYear(dateStr) {
         let [y, m] = dateStr.split('-');
         return `${y - 1}-${m}`;
     }
 
-    // 解析時間標題 (例如 1月-99)
     function parseMonthHeader(headerStr) {
         const match = headerStr.match(/(\d+)月-(\d+)/);
         if (!match) return null;
@@ -100,7 +97,6 @@
         return `${year}-${month}`;
     }
 
-    // 讀取 CSV 資料
     Papa.parse(sheetUrl, {
         download: true,
         header: true,
@@ -108,21 +104,18 @@
             const rawData = results.data;
             const headers = results.meta.fields;
             
-            // 變更點：A欄(0)為公司名，B欄(1)為屬性類別
             const companyColName = headers[0]; 
             const categoryColName = headers[1]; 
 
             rawData.forEach(row => {
                 const companyName = row[companyColName];
-                const categoryName = row[categoryColName] || '未分類'; // 如果B欄空白則歸為未分類
+                const categoryName = row[categoryColName] || '未分類'; 
                 
                 if (!companyName || companyName.trim() === '') return; 
 
-                // 紀錄屬性與公司的階層關係
                 if (!categoryMap[categoryName]) categoryMap[categoryName] = new Set();
                 categoryMap[categoryName].add(companyName.trim());
 
-                // 變更點：從索引 2 (C欄) 開始才是時間資料
                 for(let i = 2; i < headers.length; i++) {
                     const header = headers[i];
                     const standardDate = parseMonthHeader(header);
@@ -144,7 +137,7 @@
                 }
             });
 
-            calculateGrowthRates(); // 計算 MoM 與 YoY
+            calculateGrowthRates(); 
 
             document.getElementById('loadingMsg').style.display = 'none';
             document.getElementById('chartWrapper').style.display = 'block';
@@ -158,9 +151,7 @@
         }
     });
 
-    // 批次計算 MoM 與 YoY
     function calculateGrowthRates() {
-        // 建立快速查詢字典以提高效能
         let revDict = {};
         longFormatData.forEach(item => {
             if (!revDict[item.company]) revDict[item.company] = {};
@@ -174,14 +165,12 @@
             let revPrevM = revDict[item.company][prevM];
             let revPrevY = revDict[item.company][prevY];
             
-            // 計算 MoM
             if (revPrevM && revPrevM !== 0) {
                 item.mom = ((item.revenue - revPrevM) / revPrevM) * 100;
             } else {
                 item.mom = null;
             }
             
-            // 計算 YoY
             if (revPrevY && revPrevY !== 0) {
                 item.yoy = ((item.revenue - revPrevY) / revPrevY) * 100;
             } else {
@@ -190,7 +179,6 @@
         });
     }
 
-    // 建立第一層「屬性」選單
     function populateCategoryDropdown() {
         const catSelect = document.getElementById('categorySelect');
         const categories = Object.keys(categoryMap).sort();
@@ -203,20 +191,24 @@
         });
     }
 
-    // 當選擇「屬性」時，連動更新第二層「公司」選單
     function onCategoryChange() {
         const catSelect = document.getElementById('categorySelect');
         const compSelect = document.getElementById('companySelect');
         const selectedCat = catSelect.value;
         
-        compSelect.innerHTML = ''; // 清空公司選單
+        compSelect.innerHTML = ''; 
         
         if (!selectedCat) {
             compSelect.innerHTML = '<option value="">請先選擇屬性</option>';
             return;
         }
 
-        // 撈出該屬性下的所有公司
+        // ⭐ 新增功能：動態加入「整體營收」選項
+        const allOption = document.createElement('option');
+        allOption.value = 'ALL_IN_CATEGORY';
+        allOption.text = `⭐ ${selectedCat} 產業整體營收`;
+        compSelect.appendChild(allOption);
+
         const companies = Array.from(categoryMap[selectedCat]).sort();
         companies.forEach(comp => {
             const option = document.createElement('option');
@@ -226,7 +218,6 @@
         });
     }
 
-    // 格式化百分比數值(加上顏色與符號)
     function formatPercent(val) {
         if (val === null || val === undefined) return '-';
         let sign = val > 0 ? '+' : '';
@@ -242,17 +233,59 @@
     }
 
     function updateView() {
+        const selectedCat = document.getElementById('categorySelect').value;
         const selectedCompany = document.getElementById('companySelect').value;
-        if (!selectedCompany) {
+        
+        if (!selectedCat || !selectedCompany) {
             alert('請完整選擇屬性與公司名稱！');
             return;
         }
         
-        let filtered = longFormatData.filter(row => row.company === selectedCompany);
-        filtered.sort((a, b) => a.date.localeCompare(b.date));
+        let filtered = [];
+        let chartTitle = '';
+
+        // ⭐ 新增功能：若選擇「整體營收」，則在背景動態加總資料
+        if (selectedCompany === 'ALL_IN_CATEGORY') {
+            chartTitle = `${selectedCat} 產業整體走勢`;
+            let aggregated = {};
+            
+            // 1. 將該類別下所有公司的每個月營收加總
+            longFormatData.forEach(row => {
+                if (row.category === selectedCat) {
+                    if (!aggregated[row.date]) aggregated[row.date] = 0;
+                    aggregated[row.date] += row.revenue;
+                }
+            });
+
+            // 2. 將加總後的物件轉回陣列，並排序
+            filtered = Object.keys(aggregated).map(date => ({
+                date: date,
+                company: `整體 ${selectedCat}`,
+                revenue: aggregated[date]
+            }));
+            filtered.sort((a, b) => a.date.localeCompare(b.date));
+
+            // 3. 重新計算整體產業的 MoM 與 YoY
+            filtered.forEach(item => {
+                let prevM = getPrevMonth(item.date);
+                let prevY = getPrevYear(item.date);
+                
+                let revPrevM = aggregated[prevM];
+                let revPrevY = aggregated[prevY];
+                
+                item.mom = (revPrevM && revPrevM !== 0) ? ((item.revenue - revPrevM) / revPrevM) * 100 : null;
+                item.yoy = (revPrevY && revPrevY !== 0) ? ((item.revenue - revPrevY) / revPrevY) * 100 : null;
+            });
+            
+        } else {
+            // 原本的單一公司查詢邏輯
+            chartTitle = selectedCompany;
+            filtered = longFormatData.filter(row => row.company === selectedCompany);
+            filtered.sort((a, b) => a.date.localeCompare(b.date));
+        }
 
         updateTable(filtered);
-        updateChart(filtered, selectedCompany);
+        updateChart(filtered, chartTitle);
     }
 
     function updateTable(data) {
@@ -278,7 +311,8 @@
         });
     }
 
-    function updateChart(data, companyName) {
+    // 接收 chartTitle 作為參數，讓圖表標題動態改變
+    function updateChart(data, chartTitle) {
         const chartDom = document.getElementById('revenueChart');
         if (myChart) myChart.dispose();
         myChart = echarts.init(chartDom);
@@ -303,12 +337,7 @@
                 borderColor: '#ccc',
                 textStyle: { color: '#333' }
             },
-            grid: {
-                left: '2%',
-                right: '8%', 
-                bottom: '15%', 
-                containLabel: true
-            },
+            grid: { left: '2%', right: '8%', bottom: '15%', containLabel: true },
             xAxis: {
                 type: 'category',
                 data: labels,
@@ -321,24 +350,11 @@
                 splitLine: { lineStyle: { color: '#f5f5f5' } }
             },
             dataZoom: [
-                {
-                    type: 'slider',
-                    show: true,
-                    xAxisIndex: [0],
-                    start: 80, 
-                    end: 100,
-                    bottom: 10,
-                    right: '8%'
-                },
-                {
-                    type: 'inside',
-                    xAxisIndex: [0],
-                    start: 80,
-                    end: 100
-                }
+                { type: 'slider', show: true, xAxisIndex: [0], start: 80, end: 100, bottom: 10, right: '8%' },
+                { type: 'inside', xAxisIndex: [0], start: 80, end: 100 }
             ],
             series: [{
-                name: companyName,
+                name: chartTitle, // 使用動態標題
                 type: 'line',
                 data: revenues,
                 itemStyle: { color: '#1971c2' }, 
