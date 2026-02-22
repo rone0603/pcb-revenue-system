@@ -27,15 +27,8 @@
         .tab-btn { padding: 6px 15px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 0.9rem; transition: 0.2s; }
         .tab-btn.active { background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--primary); font-weight: bold; }
 
-        select { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
-
-        .mini-calendar { display: flex; border: 1px solid var(--primary); border-radius: 4px; overflow: hidden; height: 32px; }
-        .cal-y { background: var(--primary); color: #fff; padding: 0 8px; line-height: 32px; cursor: pointer; font-size: 0.85rem; }
-        .cal-m-grid { display: flex; background: #fff; }
-        .cal-m { padding: 0 8px; line-height: 32px; cursor: pointer; border-left: 1px solid #eee; font-size: 0.85rem; }
-        .cal-m:hover { background: #f0f7ff; }
-        .cal-m.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-        .cal-m.disabled { color: #ccc; cursor: not-allowed; }
+        select { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; background: #fff; cursor: pointer; }
+        select:disabled { background: #f5f5f5; color: #aaa; cursor: not-allowed; }
 
         .table-area { overflow-x: auto; max-height: 600px; border: 1px solid #eee; border-radius: 4px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
@@ -75,12 +68,11 @@
             <select id="compSel" onchange="updateView()"></select>
         </div>
 
-        <div id="dateBox" style="display:none; align-items: center; gap: 8px;">
+        <div id="dateBox" style="display:none; align-items: center; gap: 10px;">
+            <span>年份:</span>
+            <select id="yearSel" onchange="validateMonths()"></select>
             <span>月份:</span>
-            <div class="mini-calendar">
-                <div class="cal-y" onclick="shiftYear(-1)">❮ <span id="yLabel">2026</span> ❯</div>
-                <div id="mGrid" class="cal-m-grid"></div>
-            </div>
+            <select id="monthSel" onchange="updateView()"></select>
         </div>
     </div>
 
@@ -101,10 +93,9 @@
     
     let rawStore = []; 
     let compsByCat = { "PCB": {}, "原物料": {}, "設備": {} }; 
-    let dates = new Set();
+    let availableDates = new Set(); 
     let chart = null;
     let mode = 'trend';
-    let curY = 2026, curM = "01";
 
     const sortWeight = {
         "硬板": 1, "軟板": 2,
@@ -140,7 +131,7 @@
             for (let r = 4; r < d.length; r++) {
                 let t = parseD(d[r][0]);
                 if (!t) continue;
-                dates.add(t.full);
+                availableDates.add(t.full);
                 for (let c = 1; c < cRow.length; c++) {
                     let name = String(cRow[c]).trim();
                     let val = parseFloat(String(d[r][c]).replace(/,/g, ''));
@@ -148,12 +139,19 @@
                 }
             }
             
-            let latest = Array.from(dates).sort().reverse()[0].split('-');
-            curY = parseInt(latest[0]); curM = latest[1];
+            // 初始化年份選單
+            const yearSel = document.getElementById('yearSel');
+            const endYear = new Date().getFullYear();
+            for(let y = endYear; y >= 1999; y--) yearSel.appendChild(new Option(y + "年", y));
+            
+            // 抓取最新有資料的年月
+            let dateArr = Array.from(availableDates).sort().reverse();
+            let latest = dateArr[0].split('-');
+            yearSel.value = parseInt(latest[0]);
             
             calcRates();
             onCatChange();
-            renderMGrid();
+            validateMonths(latest[1]); // 傳入最新月份作為預設
             updateView();
         }
     });
@@ -164,10 +162,44 @@
         rawStore.forEach(i => {
             let [y, m] = i.date.split('-');
             let pm = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
-            let py = `${y-1}-${m}`;
+            let py = `${i.y - 1}-${i.m}`;
             i.mom = dict[i.name][pm] ? (i.rev - dict[i.name][pm])/dict[i.name][pm]*100 : null;
             i.yoy = dict[i.name][py] ? (i.rev - dict[i.name][py])/dict[i.name][py]*100 : null;
         });
+    }
+
+    // 🌟 核心功能：動態檢查月份有效性
+    function validateMonths(defaultMonth = null) {
+        const year = document.getElementById('yearSel').value;
+        const monthSel = document.getElementById('monthSel');
+        const currentVal = monthSel.value;
+        monthSel.innerHTML = '';
+
+        let firstAvailable = null;
+        for(let i = 1; i <= 12; i++) {
+            let mStr = String(i).padStart(2, '0');
+            let dateStr = `${year}-${mStr}`;
+            let hasData = availableDates.has(dateStr);
+            
+            let opt = new Option(i + "月" + (hasData ? "" : " (無資料)"), mStr);
+            if (!hasData) {
+                opt.disabled = true;
+                opt.style.color = "#ccc";
+            } else {
+                if (!firstAvailable) firstAvailable = mStr;
+            }
+            monthSel.add(opt);
+        }
+
+        // 邏輯處理：如果原本選的月份在新年度無效，切換到該年第一個有效月
+        if (defaultMonth && availableDates.has(`${year}-${defaultMonth}`)) {
+            monthSel.value = defaultMonth;
+        } else if (availableDates.has(`${year}-${currentVal}`)) {
+            monthSel.value = currentVal;
+        } else {
+            monthSel.value = firstAvailable || "01";
+        }
+        updateView();
     }
 
     function switchMode(m) {
@@ -178,22 +210,6 @@
         document.getElementById('chartWrapper').style.display = m === 'trend' ? 'block' : 'none';
         updateView();
     }
-
-    function renderMGrid() {
-        document.getElementById('yLabel').innerText = curY;
-        const g = document.getElementById('mGrid'); g.innerHTML = '';
-        for(let i=1; i<=12; i++) {
-            let mm = String(i).padStart(2, '0');
-            let has = dates.has(`${curY}-${mm}`);
-            let div = document.createElement('div');
-            div.className = `cal-m ${mm === curM ? 'active' : ''} ${!has ? 'disabled' : ''}`;
-            div.innerText = i;
-            if(has) div.onclick = () => { curM = mm; renderMGrid(); updateView(); };
-            g.appendChild(div);
-        }
-    }
-
-    function shiftYear(n) { curY += n; renderMGrid(); }
 
     function onCatChange() {
         const cat = document.getElementById('catSel').value;
@@ -210,7 +226,7 @@
         if(mode === 'trend') {
             renderTrend(cat, document.getElementById('compSel').value);
         } else {
-            renderCross(cat, `${curY}-${curM}`);
+            renderCross(cat, `${document.getElementById('yearSel').value}-${document.getElementById('monthSel').value}`);
         }
     }
 
@@ -238,7 +254,7 @@
         let items = rawStore.filter(r => r.date === targetDate && compsByCat[cat][r.name]);
         let [y, m] = targetDate.split('-');
         let prevMDate = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
-        let prevYDate = `${y-1}-${m}`;
+        let prevYDate = `${parseInt(y) - 1}-${m}`;
 
         items.sort((a, b) => {
             let wA = sortWeight[a.type] || 99;
@@ -289,52 +305,28 @@
 
     function fillTable(h, d, fn) {
         document.getElementById('tHead').innerHTML = h.map(i => `<th>${i}</th>`).join('');
-        document.getElementById('tBody').innerHTML = d.map(r => `<tr>${fn(r)}</tr>`).join('');
+        document.getElementById('tBody').innerHTML = d.length ? d.map(r => `<tr>${fn(r)}</tr>`).join('') : `<tr><td colspan="${h.length}">此月份暫無資料</td></tr>`;
     }
 
     function fPct(v) { return v === null ? '-' : `<span class="${v>0?'up':'down'}">${v>0?'+':''}${v.toFixed(2)}%</span>`; }
 
-    // 🌟 圖表修正：大幅增加右邊距與優化標籤對齊
     function draw(t, x, s) {
         if(chart) chart.dispose();
         chart = echarts.init(document.getElementById('mainChart'));
         chart.setOption({
             title: { text: t, left: 'center', top: 5 },
             tooltip: { trigger: 'axis' },
-            grid: { 
-                top: 50,
-                bottom: 80, 
-                left: 70, 
-                right: 60, // 🌟 預留足夠空間給最右側標籤
-                containLabel: true 
-            },
+            grid: { top: 50, bottom: 85, left: 85, right: 85, containLabel: true },
             xAxis: { 
                 type: 'category', 
                 data: x, 
-                axisLabel: { 
-                    rotate: 45, 
-                    interval: 'auto',
-                    margin: 12,
-                    fontSize: 11,
-                    align: 'right' // 🌟 改為右對齊，確保旋轉時標籤往左內縮
-                } 
+                axisLabel: { rotate: 45, interval: 'auto', margin: 15, fontSize: 11, align: 'right', hideOverlap: true } 
             },
-            yAxis: { 
-                type: 'value', 
-                axisLabel: { 
-                    formatter: v => (v/1000000).toFixed(1) + 'B',
-                    fontSize: 11
-                } 
-            },
-            dataZoom: [{ 
-                type: 'slider', 
-                bottom: 5, 
-                height: 18, 
-                handleSize: '100%',
-                start: x.length > 24 ? 100-(24/x.length*100) : 0 
-            }],
+            yAxis: { type: 'value', axisLabel: { formatter: v => (v/1000000).toFixed(1) + 'B', fontSize: 11 } },
+            dataZoom: [{ type: 'slider', bottom: 8, height: 18, handleSize: '100%', start: x.length > 24 ? 100-(24/x.length*100) : 0 }],
             series: [{ data: s, type: 'line', smooth: true, areaStyle: { color: 'rgba(25, 113, 194, 0.08)' }, itemStyle: { color: '#1971c2' } }]
         });
+        window.addEventListener('resize', () => chart.resize());
     }
 </script>
 </body>
