@@ -3,353 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PCB產業上市櫃公司營收查詢系統</title>
+    <title>PCB產業上市櫃營收分析</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; background-color: #ffffff; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border-radius: 8px;}
-        h2 { text-align: center; color: #222; font-weight: 600; margin-bottom: 30px; }
-        .controls { margin-bottom: 20px; padding: 20px; background: #f8f9fa; border: 1px solid #eeeeee; display: flex; gap: 20px; align-items: center; justify-content: center; border-radius: 6px; }
-        .controls select { padding: 10px; border: 1px solid #ccc; font-size: 15px; border-radius: 4px; min-width: 150px; cursor: pointer; }
-        .chart-container { position: relative; height: 450px; width: 100%; margin-bottom: 30px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; }
-        th, td { border: 1px solid #eaeaea; padding: 12px; text-align: center; }
-        th { background-color: #f1f3f5; color: #333; position: sticky; top: 0; font-weight: 600; z-index: 10; }
-        tr:hover { background-color: #f8f9fa; }
-        button { padding: 10px 24px; background-color: #1971c2; color: white; border: none; cursor: pointer; font-weight: bold; font-size: 15px; border-radius: 4px; transition: 0.2s; }
-        button:hover { background-color: #1864ab; }
-        .data-table-container { max-height: 500px; overflow-y: auto; border: 1px solid #eaeaea; border-radius: 4px; }
-        .loading { text-align: center; color: #e67e22; font-weight: bold; font-size: 1.1em; margin: 20px 0; }
+        :root { 
+            --primary: #1971c2; 
+            --sub-sum-bg: #f1f3f5; 
+            --pcb-total-bg: #e7f5ff; 
+            --mat-total-bg: #f3f0ff; 
+            --eq-total-bg: #fff9db;  
+        }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; padding: 15px; background: #f4f7f9; color: #333; margin: 0; }
+        .container { max-width: 1300px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
         
-        /* 漲跌顏色標示 (台股習慣：紅漲綠跌) */
-        .up-red { color: #e74c3c; font-weight: bold; }
-        .down-green { color: #2ecc71; font-weight: bold; }
+        header { display: flex; flex-direction: column; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .data-source { font-size: 0.8rem; color: #888; margin-top: 5px; }
+        h2 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+
+        .controls { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; background: #fafafa; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.95rem; }
+        .tab-group { display: flex; background: #eee; padding: 3px; border-radius: 6px; }
+        .tab-btn { padding: 6px 15px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 0.9rem; transition: 0.2s; }
+        .tab-btn.active { background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--primary); font-weight: bold; }
+
+        select { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
+
+        .mini-calendar { display: flex; border: 1px solid var(--primary); border-radius: 4px; overflow: hidden; height: 32px; }
+        .cal-y { background: var(--primary); color: #fff; padding: 0 8px; line-height: 32px; cursor: pointer; font-size: 0.85rem; }
+        .cal-m-grid { display: flex; background: #fff; }
+        .cal-m { padding: 0 8px; line-height: 32px; cursor: pointer; border-left: 1px solid #eee; font-size: 0.85rem; }
+        .cal-m:hover { background: #f0f7ff; }
+        .cal-m.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .cal-m.disabled { color: #ccc; cursor: not-allowed; }
+
+        .table-area { overflow-x: auto; max-height: 600px; border: 1px solid #eee; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 800px; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; padding: 10px; border: 1px solid #eee; }
+        td { padding: 8px 10px; border: 1px solid #eee; text-align: center; }
+        
+        .sum-row { background-color: var(--sub-sum-bg) !important; font-weight: bold; }
+        .total-pcb { background-color: var(--pcb-total-bg) !important; font-weight: bold; border-top: 2px solid #339af0 !important; }
+        .total-mat { background-color: var(--mat-total-bg) !important; font-weight: bold; border-top: 2px solid #845ef7 !important; }
+        .total-eq { background-color: var(--eq-total-bg) !important; font-weight: bold; border-top: 2px solid #fcc419 !important; }
+
+        .up { color: #e74c3c; font-weight: bold; }
+        .down { color: #2ecc71; font-weight: bold; }
+        .chart-box { height: 420px; margin-bottom: 20px; border: 1px solid #eee; padding: 5px; border-radius: 4px; background: #fff; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📊 PCB產業上市櫃公司營收查詢系統</h2>
-    
+    <header>
+        <div class="header-top">
+            <h2>📊 PCB產業上市櫃營收分析</h2>
+            <div class="tab-group">
+                <button class="tab-btn active" onclick="switchMode('trend')">歷年營收走勢</button>
+                <button class="tab-btn" onclick="switchMode('cross')">單月同業比較</button>
+            </div>
+        </div>
+        <div class="data-source">資料來源：公開資訊觀測站 (MOPS)</div>
+    </header>
+
     <div class="controls">
-        <div>
-            <label>1. 選擇屬性：</label>
-            <select id="categorySelect" onchange="onCategoryChange()">
-                <option value="">請選擇...</option>
-            </select>
+        <span>產業類別:</span>
+        <select id="catSel" onchange="onCatChange()"></select>
+
+        <div id="compBox">
+            <span>公司:</span>
+            <select id="compSel" onchange="updateView()"></select>
         </div>
-        <div>
-            <label>2. 選擇公司：</label>
-            <select id="companySelect">
-                <option value="">請先選擇屬性</option>
-            </select>
+
+        <div id="dateBox" style="display:none; align-items: center; gap: 8px;">
+            <span>月份:</span>
+            <div class="mini-calendar">
+                <div class="cal-y" onclick="shiftYear(-1)">❮ <span id="yLabel">2026</span> ❯</div>
+                <div id="mGrid" class="cal-m-grid"></div>
+            </div>
         </div>
-        <button onclick="updateView()">查詢營收走勢</button>
     </div>
 
-    <div id="loadingMsg" class="loading">正在從資料庫載入與運算 YoY/MoM 資料，請稍候...</div>
-
-    <div class="chart-container" id="chartWrapper" style="display:none;">
-        <div id="revenueChart" style="width: 100%; height: 100%;"></div>
+    <div id="chartWrapper" class="chart-box">
+        <div id="mainChart" style="width:100%; height:100%;"></div>
     </div>
 
-    <div class="data-table-container" id="tableWrapper" style="display:none;">
-        <table id="resultTable">
-            <thead>
-                <tr>
-                    <th>年月</th>
-                    <th>公司名稱</th>
-                    <th>營收 (千元)</th>
-                    <th>MoM (月增率)</th>
-                    <th>YoY (年增率)</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
+    <div class="table-area">
+        <table>
+            <thead><tr id="tHead"></tr></thead>
+            <tbody id="tBody"></tbody>
         </table>
     </div>
 </div>
 
 <script>
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/1i1EckrHnN_tpe9h4lCHHNmP1InDK3RG_NwuoSlP18A4/gviz/tq?tqx=out:csv&gid=705831233';
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRv9UI5EshxGcMZgMwHt_1X7ZrGVJOyxcX--csAHwRg8zlb7wFOc0vKDA5KndHPfZzD_lOiDULOHqyI/pub?gid=1625717378&single=true&output=csv';
     
-    let longFormatData = []; 
-    let categoryMap = {}; // 儲存 { 'PCB': ['臻鼎', '欣興'], '設備': [...] }
-    let myChart = null;      
+    let rawStore = []; 
+    let compsByCat = { "PCB": {}, "原物料": {}, "設備": {} }; 
+    let dates = new Set();
+    let chart = null;
+    let mode = 'trend';
+    let curY = 2026, curM = "01";
 
-    // 取得前一個月的字串 (計算 MoM 用)
-    function getPrevMonth(dateStr) {
-        let [y, m] = dateStr.split('-');
-        let d = new Date(y, m - 1 - 1, 1);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const sortWeight = {
+        "硬板": 1, "軟板": 2,
+        "玻纖": 1, "銅箔": 2, "CCL": 3, "FCCL": 4, "原物料相關": 5,
+        "設備": 1
+    };
+
+    function parseD(s) {
+        let m = String(s).match(/^(\d{4})[-\/](\d{1,2})/) || String(s).match(/^(\d{1,2})月?-(\d{2,3})$/);
+        if (!m) return null;
+        let y = m[1].length === 4 ? m[1] : (parseInt(m[2]) >= 50 ? 1900 + parseInt(m[2]) : 2000 + parseInt(m[2]));
+        let mon = (m[1].length === 4 ? m[2] : m[1]).padStart(2, '0');
+        return { y: String(y), m: mon, full: `${y}-${mon}` };
     }
 
-    // 取得去年的字串 (計算 YoY 用)
-    function getPrevYear(dateStr) {
-        let [y, m] = dateStr.split('-');
-        return `${y - 1}-${m}`;
-    }
-
-    // 解析時間標題 (例如 1月-99)
-    function parseMonthHeader(headerStr) {
-        const match = headerStr.match(/(\d+)月-(\d+)/);
-        if (!match) return null;
-        let month = match[1].padStart(2, '0');
-        let yearNum = parseInt(match[2], 10);
-        let year = yearNum > 50 ? (1900 + yearNum) : (2000 + yearNum); 
-        return `${year}-${month}`;
-    }
-
-    // 讀取 CSV 資料
     Papa.parse(sheetUrl, {
         download: true,
-        header: true,
-        complete: function(results) {
-            const rawData = results.data;
-            const headers = results.meta.fields;
-            
-            // 變更點：A欄(0)為公司名，B欄(1)為屬性類別
-            const companyColName = headers[0]; 
-            const categoryColName = headers[1]; 
+        complete: function(res) {
+            const d = res.data;
+            if(!d || d.length < 5) return;
+            const cRow = d[1], tRow = d[3];
 
-            rawData.forEach(row => {
-                const companyName = row[companyColName];
-                const categoryName = row[categoryColName] || '未分類'; // 如果B欄空白則歸為未分類
-                
-                if (!companyName || companyName.trim() === '') return; 
+            for (let c = 1; c < cRow.length; c++) {
+                let name = String(cRow[c]).trim(), type = String(tRow[c]).trim();
+                if (!name) continue;
+                let cat = type.match(/硬板|軟板/) ? "PCB" : (type.includes("設備") ? "設備" : "原物料");
+                compsByCat[cat][name] = type;
+            }
 
-                // 紀錄屬性與公司的階層關係
-                if (!categoryMap[categoryName]) categoryMap[categoryName] = new Set();
-                categoryMap[categoryName].add(companyName.trim());
+            const catSel = document.getElementById('catSel');
+            Object.keys(compsByCat).forEach(k => catSel.appendChild(new Option(k, k)));
 
-                // 變更點：從索引 2 (C欄) 開始才是時間資料
-                for(let i = 2; i < headers.length; i++) {
-                    const header = headers[i];
-                    const standardDate = parseMonthHeader(header);
-                    
-                    if (standardDate) {
-                        let rawValue = row[header];
-                        let revenueVal = 0;
-                        if(rawValue) revenueVal = parseFloat(rawValue.replace(/,/g, ''));
-                        
-                        if (!isNaN(revenueVal) && rawValue !== "") {
-                            longFormatData.push({
-                                company: companyName.trim(),
-                                category: categoryName,
-                                date: standardDate,
-                                revenue: revenueVal
-                            });
-                        }
-                    }
+            for (let r = 4; r < d.length; r++) {
+                let t = parseD(d[r][0]);
+                if (!t) continue;
+                dates.add(t.full);
+                for (let c = 1; c < cRow.length; c++) {
+                    let name = String(cRow[c]).trim();
+                    let val = parseFloat(String(d[r][c]).replace(/,/g, ''));
+                    if (name && !isNaN(val)) rawStore.push({ name, date: t.full, y: t.y, m: t.m, rev: val, type: tRow[c] });
                 }
-            });
-
-            calculateGrowthRates(); // 計算 MoM 與 YoY
-
-            document.getElementById('loadingMsg').style.display = 'none';
-            document.getElementById('chartWrapper').style.display = 'block';
-            document.getElementById('tableWrapper').style.display = 'block';
+            }
             
-            populateCategoryDropdown();
-        },
-        error: function() {
-            document.getElementById('loadingMsg').innerText = '資料載入失敗，請確認試算表權限。';
-            document.getElementById('loadingMsg').style.color = 'red';
+            let latest = Array.from(dates).sort().reverse()[0].split('-');
+            curY = parseInt(latest[0]); curM = latest[1];
+            
+            calcRates();
+            onCatChange();
+            renderMGrid();
+            updateView();
         }
     });
 
-    // 批次計算 MoM 與 YoY
-    function calculateGrowthRates() {
-        // 建立快速查詢字典以提高效能
-        let revDict = {};
-        longFormatData.forEach(item => {
-            if (!revDict[item.company]) revDict[item.company] = {};
-            revDict[item.company][item.date] = item.revenue;
-        });
-
-        longFormatData.forEach(item => {
-            let prevM = getPrevMonth(item.date);
-            let prevY = getPrevYear(item.date);
-            
-            let revPrevM = revDict[item.company][prevM];
-            let revPrevY = revDict[item.company][prevY];
-            
-            // 計算 MoM
-            if (revPrevM && revPrevM !== 0) {
-                item.mom = ((item.revenue - revPrevM) / revPrevM) * 100;
-            } else {
-                item.mom = null;
-            }
-            
-            // 計算 YoY
-            if (revPrevY && revPrevY !== 0) {
-                item.yoy = ((item.revenue - revPrevY) / revPrevY) * 100;
-            } else {
-                item.yoy = null;
-            }
+    function calcRates() {
+        let dict = {};
+        rawStore.forEach(i => { if(!dict[i.name]) dict[i.name] = {}; dict[i.name][i.date] = i.rev; });
+        rawStore.forEach(i => {
+            let [y, m] = i.date.split('-');
+            let pm = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
+            let py = `${y-1}-${m}`;
+            i.mom = dict[i.name][pm] ? (i.rev - dict[i.name][pm])/dict[i.name][pm]*100 : null;
+            i.yoy = dict[i.name][py] ? (i.rev - dict[i.name][py])/dict[i.name][py]*100 : null;
         });
     }
 
-    // 建立第一層「屬性」選單
-    function populateCategoryDropdown() {
-        const catSelect = document.getElementById('categorySelect');
-        const categories = Object.keys(categoryMap).sort();
-        
-        categories.forEach(cat => {
-            const option = document.createElement('option');
-            option.value = cat;
-            option.text = cat;
-            catSelect.appendChild(option);
-        });
+    function switchMode(m) {
+        mode = m;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.innerText === (m === 'trend' ? '歷年營收走勢' : '單月同業比較')));
+        document.getElementById('compBox').style.display = m === 'trend' ? 'block' : 'none';
+        document.getElementById('dateBox').style.display = m === 'cross' ? 'flex' : 'none';
+        document.getElementById('chartWrapper').style.display = m === 'trend' ? 'block' : 'none';
+        updateView();
     }
 
-    // 當選擇「屬性」時，連動更新第二層「公司」選單
-    function onCategoryChange() {
-        const catSelect = document.getElementById('categorySelect');
-        const compSelect = document.getElementById('companySelect');
-        const selectedCat = catSelect.value;
-        
-        compSelect.innerHTML = ''; // 清空公司選單
-        
-        if (!selectedCat) {
-            compSelect.innerHTML = '<option value="">請先選擇屬性</option>';
-            return;
+    function renderMGrid() {
+        document.getElementById('yLabel').innerText = curY;
+        const g = document.getElementById('mGrid'); g.innerHTML = '';
+        for(let i=1; i<=12; i++) {
+            let mm = String(i).padStart(2, '0');
+            let has = dates.has(`${curY}-${mm}`);
+            let div = document.createElement('div');
+            div.className = `cal-m ${mm === curM ? 'active' : ''} ${!has ? 'disabled' : ''}`;
+            div.innerText = i;
+            if(has) div.onclick = () => { curM = mm; renderMGrid(); updateView(); };
+            g.appendChild(div);
         }
-
-        // 撈出該屬性下的所有公司
-        const companies = Array.from(categoryMap[selectedCat]).sort();
-        companies.forEach(comp => {
-            const option = document.createElement('option');
-            option.value = comp;
-            option.text = comp;
-            compSelect.appendChild(option);
-        });
     }
 
-    // 格式化百分比數值(加上顏色與符號)
-    function formatPercent(val) {
-        if (val === null || val === undefined) return '-';
-        let sign = val > 0 ? '+' : '';
-        let colorClass = val > 0 ? 'up-red' : (val < 0 ? 'down-green' : '');
-        return `<span class="${colorClass}">${sign}${val.toFixed(2)}%</span>`;
-    }
+    function shiftYear(n) { curY += n; renderMGrid(); }
 
-    function formatPercentForTooltip(val) {
-        if (val === null || val === undefined) return '-';
-        let sign = val > 0 ? '+' : '';
-        let color = val > 0 ? '#e74c3c' : (val < 0 ? '#2ecc71' : '#333');
-        return `<span style="color:${color}; font-weight:bold;">${sign}${val.toFixed(2)}%</span>`;
+    function onCatChange() {
+        const cat = document.getElementById('catSel').value;
+        const sel = document.getElementById('compSel'); sel.innerHTML = '';
+        if(!cat) return;
+        sel.appendChild(new Option(`⭐ ${cat}整體`, 'ALL'));
+        Object.keys(compsByCat[cat]).sort().forEach(c => sel.appendChild(new Option(c, c)));
+        updateView();
     }
 
     function updateView() {
-        const selectedCompany = document.getElementById('companySelect').value;
-        if (!selectedCompany) {
-            alert('請完整選擇屬性與公司名稱！');
-            return;
+        const cat = document.getElementById('catSel').value;
+        if(!cat) return;
+        if(mode === 'trend') {
+            renderTrend(cat, document.getElementById('compSel').value);
+        } else {
+            renderCross(cat, `${curY}-${curM}`);
         }
-        
-        let filtered = longFormatData.filter(row => row.company === selectedCompany);
-        filtered.sort((a, b) => a.date.localeCompare(b.date));
-
-        updateTable(filtered);
-        updateChart(filtered, selectedCompany);
     }
 
-    function updateTable(data) {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-        
-        if(data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5">找不到符合條件的資料</td></tr>';
-            return;
+    function renderTrend(cat, comp) {
+        let d = [];
+        if(comp === 'ALL') {
+            let agg = {};
+            rawStore.forEach(r => { if(compsByCat[cat][r.name]) agg[r.date] = (agg[r.date]||0) + r.rev; });
+            d = Object.keys(agg).sort().map(date => ({ date, rev: agg[date], name: `整體${cat}` }));
+            d.forEach(i => {
+                let [y,m] = i.date.split('-');
+                let pm = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
+                let py = `${y-1}-${m}`;
+                i.mom = agg[pm] ? (i.rev - agg[pm])/agg[pm]*100 : null;
+                i.yoy = agg[py] ? (i.rev - agg[py])/agg[py]*100 : null;
+            });
+        } else {
+            d = rawStore.filter(r => r.name === comp).sort((a,b) => a.date.localeCompare(b.date));
         }
-        
-        const reversedData = [...data].reverse();
-        reversedData.forEach(row => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${row.date}</td>
-                <td>${row.company}</td>
-                <td style="text-align: right;">${row.revenue.toLocaleString()}</td>
-                <td>${formatPercent(row.mom)}</td>
-                <td>${formatPercent(row.yoy)}</td>
-            `;
-            tbody.appendChild(tr);
+        fillTable(['年月', '營收(千元)', 'MoM', 'YoY'], d.slice().reverse(), r => `<td>${r.date}</td><td style="text-align:right">${Math.round(r.rev).toLocaleString()}</td><td>${fPct(r.mom)}</td><td>${fPct(r.yoy)}</td>`);
+        draw(comp==='ALL'?cat+'整體趨勢':comp, d.map(i=>i.date), d.map(i=>i.rev));
+    }
+
+    function renderCross(cat, targetDate) {
+        let items = rawStore.filter(r => r.date === targetDate && compsByCat[cat][r.name]);
+        let [y, m] = targetDate.split('-');
+        let prevMDate = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
+        let prevYDate = `${y-1}-${m}`;
+
+        items.sort((a, b) => {
+            let wA = sortWeight[a.type] || 99;
+            let wB = sortWeight[b.type] || 99;
+            if (wA !== wB) return wA - wB;
+            return b.rev - a.rev;
         });
+
+        let subSums = {}; 
+        let majorSum = { rev:0, prevRev:0, yearRev:0 };
+
+        rawStore.forEach(r => {
+            if (compsByCat[cat][r.name]) {
+                let t = r.type;
+                if(!subSums[t]) subSums[t] = { rev:0, prevRev:0, yearRev:0 };
+                if (r.date === targetDate) { subSums[t].rev += r.rev; majorSum.rev += r.rev; }
+                if (r.date === prevMDate) { subSums[t].prevRev += r.rev; majorSum.prevRev += r.rev; }
+                if (r.date === prevYDate) { subSums[t].yearRev += r.rev; majorSum.yearRev += r.rev; }
+            }
+        });
+
+        const rows = [];
+        items.forEach((i, idx) => { rows.push({ ...i, idx: idx+1, cls: '' }); });
+
+        Object.keys(subSums).sort((a, b) => (sortWeight[a] || 99) - (sortWeight[b] || 99)).forEach(type => {
+            if (type === '設備' && cat === '設備') return; 
+            if (subSums[type].rev === 0 && subSums[type].prevRev === 0 && subSums[type].yearRev === 0) return;
+            let mom = subSums[type].prevRev ? (subSums[type].rev - subSums[type].prevRev) / subSums[type].prevRev * 100 : null;
+            let yoy = subSums[type].yearRev ? (subSums[type].rev - subSums[type].yearRev) / subSums[type].yearRev * 100 : null;
+            rows.push({ name: type + '總和', type: '', rev: subSums[type].rev, mom: mom, yoy: yoy, idx: '', cls: 'sum-row' });
+        });
+
+        let majorMom = majorSum.prevRev ? (majorSum.rev - majorSum.prevRev) / majorSum.prevRev * 100 : null;
+        let majorYoy = majorSum.yearRev ? (majorSum.rev - majorSum.yearRev) / majorSum.yearRev * 100 : null;
+        let finalCls = cat === 'PCB' ? 'total-pcb' : (cat === '原物料' ? 'total-mat' : 'total-eq');
+        
+        rows.push({ name: cat + '總和', type: '', rev: majorSum.rev, mom: majorMom, yoy: majorYoy, idx: '', cls: finalCls });
+
+        fillTable(['序', '公司名稱', '類型', '營收(千元)', 'MoM', 'YoY'], rows, r => `
+            <td class="${r.cls}">${r.idx}</td>
+            <td class="${r.cls}">${r.name}</td>
+            <td class="${r.cls}">${r.type || ''}</td>
+            <td class="${r.cls}" style="text-align:right">${Math.round(r.rev).toLocaleString()}</td>
+            <td class="${r.cls}">${fPct(r.mom)}</td>
+            <td class="${r.cls}">${fPct(r.yoy)}</td>
+        `);
     }
 
-    function updateChart(data, companyName) {
-        const chartDom = document.getElementById('revenueChart');
-        if (myChart) myChart.dispose();
-        myChart = echarts.init(chartDom);
+    function fillTable(h, d, fn) {
+        document.getElementById('tHead').innerHTML = h.map(i => `<th>${i}</th>`).join('');
+        document.getElementById('tBody').innerHTML = d.map(r => `<tr>${fn(r)}</tr>`).join('');
+    }
 
-        const labels = data.map(item => item.date);
-        const revenues = data.map(item => item.revenue);
+    function fPct(v) { return v === null ? '-' : `<span class="${v>0?'up':'down'}">${v>0?'+':''}${v.toFixed(2)}%</span>`; }
 
-        const option = {
-            tooltip: {
-                trigger: 'axis',
-                formatter: function (params) {
-                    let date = params[0].name;
-                    let val = params[0].value;
-                    let item = data.find(d => d.date === date);
-                    
-                    let momStr = formatPercentForTooltip(item.mom);
-                    let yoyStr = formatPercentForTooltip(item.yoy);
-                    
-                    return `${date}<br/>營收: <b>${val.toLocaleString()}</b> 千元<br/>月增 (MoM): ${momStr}<br/>年增 (YoY): ${yoyStr}`;
-                },
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                borderColor: '#ccc',
-                textStyle: { color: '#333' }
+    // 🌟 圖表修正：大幅增加右邊距與優化標籤對齊
+    function draw(t, x, s) {
+        if(chart) chart.dispose();
+        chart = echarts.init(document.getElementById('mainChart'));
+        chart.setOption({
+            title: { text: t, left: 'center', top: 5 },
+            tooltip: { trigger: 'axis' },
+            grid: { 
+                top: 50,
+                bottom: 80, 
+                left: 70, 
+                right: 60, // 🌟 預留足夠空間給最右側標籤
+                containLabel: true 
             },
-            grid: {
-                left: '2%',
-                right: '8%', 
-                bottom: '15%', 
-                containLabel: true
+            xAxis: { 
+                type: 'category', 
+                data: x, 
+                axisLabel: { 
+                    rotate: 45, 
+                    interval: 'auto',
+                    margin: 12,
+                    fontSize: 11,
+                    align: 'right' // 🌟 改為右對齊，確保旋轉時標籤往左內縮
+                } 
             },
-            xAxis: {
-                type: 'category',
-                data: labels,
-                boundaryGap: false,
-                axisLine: { lineStyle: { color: '#aaa' } }
+            yAxis: { 
+                type: 'value', 
+                axisLabel: { 
+                    formatter: v => (v/1000000).toFixed(1) + 'B',
+                    fontSize: 11
+                } 
             },
-            yAxis: {
-                type: 'value',
-                axisLabel: { formatter: function(value) { return value.toLocaleString(); } },
-                splitLine: { lineStyle: { color: '#f5f5f5' } }
-            },
-            dataZoom: [
-                {
-                    type: 'slider',
-                    show: true,
-                    xAxisIndex: [0],
-                    start: 80, 
-                    end: 100,
-                    bottom: 10,
-                    right: '8%'
-                },
-                {
-                    type: 'inside',
-                    xAxisIndex: [0],
-                    start: 80,
-                    end: 100
-                }
-            ],
-            series: [{
-                name: companyName,
-                type: 'line',
-                data: revenues,
-                itemStyle: { color: '#1971c2' }, 
-                areaStyle: { color: 'rgba(25, 113, 194, 0.1)' },
-                symbol: 'none', 
-                smooth: true 
-            }]
-        };
-
-        myChart.setOption(option);
-        window.addEventListener('resize', function() { myChart.resize(); });
+            dataZoom: [{ 
+                type: 'slider', 
+                bottom: 5, 
+                height: 18, 
+                handleSize: '100%',
+                start: x.length > 24 ? 100-(24/x.length*100) : 0 
+            }],
+            series: [{ data: s, type: 'line', smooth: true, areaStyle: { color: 'rgba(25, 113, 194, 0.08)' }, itemStyle: { color: '#1971c2' } }]
+        });
     }
 </script>
 </body>
