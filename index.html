@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PCB產業上市櫃營收分析</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
@@ -14,7 +15,10 @@
             --mat-total-bg: #f3f0ff; 
             --eq-total-bg: #fff9db;  
         }
-        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; padding: 15px; background: #f4f7f9; color: #333; margin: 0; }
+        body { 
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
+            padding: 15px; background: #f4f7f9; color: #333; margin: 0; 
+        }
         .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
         
         header { display: flex; flex-direction: column; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
@@ -28,12 +32,30 @@
         .tab-btn.active { background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--primary); font-weight: bold; }
 
         select { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; background: #fff; cursor: pointer; }
-        select:disabled { background: #f5f5f5; color: #aaa; cursor: not-allowed; }
-
+        
+        /* 🌟 表格版位校正 */
         .table-area { overflow-x: auto; max-height: 600px; border: 1px solid #eee; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 1000px; }
-        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; padding: 10px; border: 1px solid #eee; }
-        td { padding: 8px 10px; border: 1px solid #eee; text-align: center; }
+        table { 
+            width: 100%; border-collapse: collapse; font-size: 0.95rem; 
+            min-width: 1200px; table-layout: auto; /* 🌟 改回自動寬度防止擠壓 */
+        }
+        th { 
+            background: #f8f9fa; position: sticky; top: 0; z-index: 10; 
+            padding: 15px 10px; border: 1px solid #eee; white-space: nowrap; 
+        }
+        td { 
+            padding: 10px 15px; border: 1px solid #eee; text-align: center; 
+            white-space: nowrap; /* 🌟 防止文字換行造成排版混亂 */
+        }
+
+        /* 🌟 數字單元格極致對齊 */
+        .num-cell { 
+            text-align: right !important; 
+            font-family: 'JetBrains Mono', monospace !important; /* 🌟 使用專用等寬字型 */
+            font-weight: 500;
+            letter-spacing: -0.5px;
+            padding-right: 30px !important; /* 🌟 統一右邊距 */
+        }
         
         .sum-row { background-color: var(--sub-sum-bg) !important; font-weight: bold; }
         .total-pcb { background-color: var(--pcb-total-bg) !important; font-weight: bold; border-top: 2px solid #339af0 !important; }
@@ -42,7 +64,7 @@
 
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #2ecc71; font-weight: bold; }
-        .chart-box { height: 420px; margin-bottom: 20px; border: 1px solid #eee; padding: 5px; border-radius: 4px; background: #fff; }
+        .chart-box { height: 450px; margin-bottom: 20px; border: 1px solid #eee; padding: 5px; border-radius: 4px; background: #fff; }
     </style>
 </head>
 <body>
@@ -98,9 +120,7 @@
     let mode = 'trend';
 
     const sortWeight = {
-        "硬板": 1, "軟板": 2,
-        "玻纖": 1, "銅箔": 2, "CCL": 3, "FCCL": 4, "原物料相關": 5,
-        "設備": 1
+        "硬板": 1, "軟板": 2, "玻纖": 1, "銅箔": 2, "CCL": 3, "FCCL": 4, "原物料相關": 5, "設備": 1
     };
 
     function parseD(s) {
@@ -140,8 +160,7 @@
             }
             
             const yearSel = document.getElementById('yearSel');
-            const endYear = new Date().getFullYear();
-            for(let y = endYear; y >= 1999; y--) yearSel.appendChild(new Option(y + "年", y));
+            for(let y = new Date().getFullYear(); y >= 1999; y--) yearSel.appendChild(new Option(y + "年", y));
             
             let dateArr = Array.from(availableDates).sort().reverse();
             let latest = dateArr[0].split('-');
@@ -150,7 +169,6 @@
             calcRates();
             onCatChange();
             validateMonths(latest[1]);
-            updateView();
         }
     });
 
@@ -173,21 +191,18 @@
         monthSel.innerHTML = '';
         let firstAvailable = null;
         for(let i = 1; i <= 12; i++) {
-            let mStr = String(i).padStart(2, '0');
-            let hasData = availableDates.has(`${year}-${mStr}`);
+            let mStr = String(i).padStart(2, '0'), hasData = availableDates.has(`${year}-${mStr}`);
             let opt = new Option(i + "月" + (hasData ? "" : " (無資料)"), mStr);
-            if (!hasData) { opt.disabled = true; opt.style.color = "#ccc"; }
-            else if (!firstAvailable) firstAvailable = mStr;
+            if (!hasData) { opt.disabled = true; opt.style.color = "#ccc"; } else if (!firstAvailable) firstAvailable = mStr;
             monthSel.add(opt);
         }
-        monthSel.value = (defaultMonth && availableDates.has(`${year}-${defaultMonth}`)) ? defaultMonth : 
-                        (availableDates.has(`${year}-${currentVal}`) ? currentVal : (firstAvailable || "01"));
+        monthSel.value = (defaultMonth && availableDates.has(`${year}-${defaultMonth}`)) ? defaultMonth : (availableDates.has(`${year}-${currentVal}`) ? currentVal : firstAvailable);
         updateView();
     }
 
     function switchMode(m) {
         mode = m;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.innerText === (m === 'trend' ? '歷年營收走勢' : '單月同業比較')));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.innerText.includes(m === 'trend' ? '歷年' : '單月')));
         document.getElementById('compBox').style.display = m === 'trend' ? 'block' : 'none';
         document.getElementById('dateBox').style.display = m === 'cross' ? 'flex' : 'none';
         document.getElementById('chartWrapper').style.display = m === 'trend' ? 'block' : 'none';
@@ -195,17 +210,15 @@
     }
 
     function onCatChange() {
-        const cat = document.getElementById('catSel').value;
-        const sel = document.getElementById('compSel'); sel.innerHTML = '';
+        const cat = document.getElementById('catSel').value, sel = document.getElementById('compSel'); sel.innerHTML = '';
         if(!cat) return;
         sel.appendChild(new Option(`⭐ ${cat}整體趨勢`, 'ALL'));
-        Object.keys(compsByCat[cat]).sort().forEach(c => sel.appendChild(new Option(c, c)));
+        Object.keys(compsByCat[cat]).sort((a,b) => a.localeCompare(b, 'zh-Hant-TW')).forEach(c => sel.appendChild(new Option(c, c)));
         updateView();
     }
 
     function updateView() {
-        const cat = document.getElementById('catSel').value;
-        if(!cat) return;
+        const cat = document.getElementById('catSel').value; if(!cat) return;
         if(mode === 'trend') renderTrend(cat, document.getElementById('compSel').value);
         else renderCross(cat, `${document.getElementById('yearSel').value}-${document.getElementById('monthSel').value}`);
     }
@@ -213,120 +226,79 @@
     function renderTrend(cat, comp) {
         let d = [];
         if(comp === 'ALL') {
-            let agg = {};
-            rawStore.forEach(r => { if(compsByCat[cat][r.name]) agg[r.date] = (agg[r.date]||0) + r.rev; });
+            let agg = {}; rawStore.forEach(r => { if(compsByCat[cat][r.name]) agg[r.date] = (agg[r.date]||0) + r.rev; });
             d = Object.keys(agg).sort().map(date => ({ date, rev: agg[date] }));
             d.forEach(i => {
                 let [y,m] = i.date.split('-');
                 let pm = `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`;
                 let py = `${y-1}-${m}`;
-                i.mom = agg[pm] ? (i.rev - agg[pm])/agg[pm]*100 : null;
-                i.yoy = agg[py] ? (i.rev - agg[py])/agg[py]*100 : null;
+                i.mom = agg[pm] ? (i.rev - agg[pm])/agg[pm]*100 : null; i.yoy = agg[py] ? (i.rev - agg[py])/agg[py]*100 : null;
             });
-        } else {
-            d = rawStore.filter(r => r.name === comp).sort((a,b) => a.date.localeCompare(b.date));
-        }
-        fillTable(['年月', '營收(千元)', 'MoM', 'YoY'], d.slice().reverse(), r => `<td>${r.date}</td><td style="text-align:right">${Math.round(r.rev).toLocaleString()}</td><td>${fPct(r.mom)}</td><td>${fPct(r.yoy)}</td>`);
-        draw(comp==='ALL'?cat+'整體趨勢':comp, d.map(i=>i.date), d.map(i=>i.rev));
+        } else { d = rawStore.filter(r => r.name === comp).sort((a,b) => a.date.localeCompare(b.date)); }
+        fillTable(['年月', '營收(千元新台幣)', 'MoM', 'YoY'], d.slice().reverse(), r => `<td>${r.date}</td><td class="num-cell">${Math.round(r.rev).toLocaleString()}</td><td class="num-cell">${fPct(r.mom)}</td><td class="num-cell">${fPct(r.yoy)}</td>`);
+        draw(comp==='ALL'?cat+'整體趨勢':comp, d.map(i=>i.date), d.map(i=>i.rev), d.map(i=>i.yoy));
     }
 
-    // 🌟 核心升級：計算累積營收與累收 YoY
     function renderCross(cat, targetDate) {
-        let [y, m] = targetDate.split('-');
-        let targetMonthInt = parseInt(m);
-        
+        let [y, m] = targetDate.split('-'), targetMonthInt = parseInt(m);
         let items = rawStore.filter(r => r.date === targetDate && compsByCat[cat][r.name]);
+        items.sort((a, b) => (sortWeight[a.type] || 99) !== (sortWeight[b.type] || 99) ? (sortWeight[a.type] || 99) - (sortWeight[b.type] || 99) : b.rev - a.rev);
         
-        // 排序廠商
-        items.sort((a, b) => {
-            let wA = sortWeight[a.type] || 99, wB = sortWeight[b.type] || 99;
-            if (wA !== wB) return wA - wB;
-            return b.rev - a.rev;
-        });
-
-        // 建立累積數據字典
-        let accData = {}; // {公司: {accRev:0, lastAccRev:0}}
+        let accData = {}; 
         rawStore.forEach(r => {
             if (compsByCat[cat][r.name]) {
                 if (!accData[r.name]) accData[r.name] = { acc: 0, lastAcc: 0 };
-                let rY = parseInt(r.y), rM = parseInt(r.m);
-                if (rY === parseInt(y) && rM <= targetMonthInt) accData[r.name].acc += r.rev;
-                if (rY === parseInt(y)-1 && rM <= targetMonthInt) accData[r.name].lastAcc += r.rev;
+                if (parseInt(r.y) === parseInt(y) && parseInt(r.m) <= targetMonthInt) accData[r.name].acc += r.rev;
+                if (parseInt(r.y) === parseInt(y)-1 && parseInt(r.m) <= targetMonthInt) accData[r.name].lastAcc += r.rev;
             }
         });
 
-        // 計算類別總和 (包含累積)
-        let subSums = {}; 
-        let majorSum = { rev:0, prevM:0, prevY:0, acc:0, lastAcc:0 };
-
+        let subSums = {}; let majorSum = { rev:0, prevM:0, prevY:0, acc:0, lastAcc:0 };
         rawStore.forEach(r => {
             if (compsByCat[cat][r.name]) {
-                let t = r.type;
-                if(!subSums[t]) subSums[t] = { rev:0, prevM:0, prevY:0, acc:0, lastAcc:0 };
-                let rDate = r.date, rY = parseInt(r.y), rM = parseInt(r.m);
-                
-                if (rDate === targetDate) { subSums[t].rev += r.rev; majorSum.rev += r.rev; }
-                if (rDate === `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`) { subSums[t].prevM += r.rev; majorSum.prevM += r.rev; }
-                if (rDate === `${parseInt(y)-1}-${m}`) { subSums[t].prevY += r.rev; majorSum.prevY += r.rev; }
-                
-                if (rY === parseInt(y) && rM <= targetMonthInt) { subSums[t].acc += r.rev; majorSum.acc += r.rev; }
-                if (rY === parseInt(y)-1 && rM <= targetMonthInt) { subSums[t].lastAcc += r.rev; majorSum.lastAcc += r.rev; }
+                let t = r.type; if(!subSums[t]) subSums[t] = { rev:0, prevM:0, prevY:0, acc:0, lastAcc:0 };
+                if (r.date === targetDate) { subSums[t].rev += r.rev; majorSum.rev += r.rev; }
+                if (r.date === `${new Date(y, m-2, 1).getFullYear()}-${String(new Date(y, m-2, 1).getMonth()+1).padStart(2, '0')}`) { subSums[t].prevM += r.rev; majorSum.prevM += r.rev; }
+                if (r.date === `${parseInt(y)-1}-${m}`) { subSums[t].prevY += r.rev; majorSum.prevY += r.rev; }
+                if (parseInt(r.y) === parseInt(y) && parseInt(r.m) <= targetMonthInt) { subSums[t].acc += r.rev; majorSum.acc += r.rev; }
+                if (parseInt(r.y) === parseInt(y)-1 && parseInt(r.m) <= targetMonthInt) { subSums[t].lastAcc += r.rev; majorSum.lastAcc += r.rev; }
             }
         });
 
         const rows = [];
-        items.forEach((i, idx) => {
-            let acc = accData[i.name].acc;
-            let lastAcc = accData[i.name].lastAcc;
-            let accYoy = lastAcc ? (acc - lastAcc) / lastAcc * 100 : null;
-            rows.push({ ...i, idx: idx+1, acc, accYoy, cls: '' });
-        });
-
-        // 插入細類統計
+        items.forEach((i, idx) => rows.push({ ...i, idx: idx+1, acc: accData[i.name].acc, accYoy: accData[i.name].lastAcc ? (accData[i.name].acc-accData[i.name].lastAcc)/accData[i.name].lastAcc*100 : null, cls: '' }));
         Object.keys(subSums).sort((a,b) => (sortWeight[a]||99)-(sortWeight[b]||99)).forEach(t => {
             if (t === '設備' && cat === '設備') return;
-            let mom = subSums[t].prevM ? (subSums[t].rev - subSums[t].prevM)/subSums[t].prevM*100 : null;
-            let yoy = subSums[t].prevY ? (subSums[t].rev - subSums[t].prevY)/subSums[t].prevY*100 : null;
-            let accYoy = subSums[t].lastAcc ? (subSums[t].acc - subSums[t].lastAcc)/subSums[t].lastAcc*100 : null;
-            rows.push({ name: t+'總和', type:'', rev: subSums[t].rev, mom, yoy, acc: subSums[t].acc, accYoy, idx: '', cls: 'sum-row' });
+            rows.push({ name: t+'總和', type:'', rev: subSums[t].rev, mom: subSums[t].prevM ? (subSums[t].rev-subSums[t].prevM)/subSums[t].prevM*100 : null, yoy: subSums[t].prevY ? (subSums[t].rev-subSums[t].prevY)/subSums[t].prevY*100 : null, acc: subSums[t].acc, accYoy: subSums[t].lastAcc ? (subSums[t].acc-subSums[t].lastAcc)/subSums[t].lastAcc*100 : null, idx: '', cls: 'sum-row' });
         });
+        rows.push({ name: cat+'總和', type:'', rev: majorSum.rev, mom: majorSum.prevM ? (majorSum.rev-majorSum.prevM)/majorSum.prevM*100 : null, yoy: majorSum.prevY ? (majorSum.rev-majorSum.prevY)/majorSum.prevY*100 : null, acc: majorSum.acc, accYoy: majorSum.lastAcc ? (majorSum.acc-majorSum.lastAcc)/majorSum.lastAcc*100 : null, idx: '', cls: cat==='PCB'?'total-pcb':(cat==='原物料'?'total-mat':'total-eq') });
 
-        // 大類總和
-        let mMom = majorSum.prevM ? (majorSum.rev - majorSum.prevM)/majorSum.prevM*100 : null;
-        let mYoy = majorSum.prevY ? (majorSum.rev - majorSum.prevY)/majorSum.prevY*100 : null;
-        let mAccYoy = majorSum.lastAcc ? (majorSum.acc - majorSum.lastAcc)/majorSum.lastAcc*100 : null;
-        rows.push({ name: cat+'總和', type:'', rev: majorSum.rev, mom: mMom, yoy: mYoy, acc: majorSum.acc, accYoy: mAccYoy, idx: '', cls: cat==='PCB'?'total-pcb':(cat==='原物料'?'total-mat':'total-eq') });
-
-        fillTable(['序', '公司名稱', '類型', '營收(千元)', 'MoM', 'YoY', '累積營收', '累收YoY'], rows, r => `
-            <td class="${r.cls}">${r.idx}</td>
-            <td class="${r.cls}">${r.name}</td>
-            <td class="${r.cls}">${r.type || ''}</td>
-            <td class="${r.cls}" style="text-align:right">${Math.round(r.rev).toLocaleString()}</td>
-            <td class="${r.cls}">${fPct(r.mom)}</td>
-            <td class="${r.cls}">${fPct(r.yoy)}</td>
-            <td class="${r.cls}" style="text-align:right">${Math.round(r.acc).toLocaleString()}</td>
-            <td class="${r.cls}">${fPct(r.accYoy)}</td>
+        fillTable(['序', '公司名稱', '類型', '營收(千元新台幣)', 'MoM', 'YoY', '累積營收(千元新台幣)', '累收YoY'], rows, r => `
+            <td>${r.idx}</td><td>${r.name}</td><td>${r.type}</td>
+            <td class="num-cell">${Math.round(r.rev).toLocaleString()}</td>
+            <td class="num-cell">${fPct(r.mom)}</td>
+            <td class="num-cell">${fPct(r.yoy)}</td>
+            <td class="num-cell">${Math.round(r.acc).toLocaleString()}</td>
+            <td class="num-cell">${fPct(r.accYoy)}</td>
         `);
     }
 
     function fillTable(h, d, fn) {
-        document.getElementById('tHead').innerHTML = h.map(i => `<th>${i}</th>`).join('');
+        document.getElementById('tHead').innerHTML = h.map(i => `<th class="${i.includes('營收') || i.includes('MoM') || i.includes('YoY') ? 'num-cell' : ''}">${i}</th>`).join('');
         document.getElementById('tBody').innerHTML = d.map(r => `<tr>${fn(r)}</tr>`).join('');
     }
 
     function fPct(v) { return v === null ? '-' : `<span class="${v>0?'up':'down'}">${v>0?'+':''}${v.toFixed(2)}%</span>`; }
 
-    function draw(t, x, s) {
-        if(chart) chart.dispose();
-        chart = echarts.init(document.getElementById('mainChart'));
+    function draw(t, x, s, yoy) {
+        if(chart) chart.dispose(); chart = echarts.init(document.getElementById('mainChart'));
         chart.setOption({
-            title: { text: t, left: 'center', top: 5 },
-            tooltip: { trigger: 'axis' },
-            grid: { top: 50, bottom: 85, left: 85, right: 85, containLabel: true },
-            xAxis: { type: 'category', data: x, axisLabel: { rotate: 45, interval: 'auto', margin: 15, fontSize: 11, align: 'right', hideOverlap: true } },
-            yAxis: { type: 'value', axisLabel: { formatter: v => (v/1000000).toFixed(1) + 'B', fontSize: 11 } },
-            dataZoom: [{ type: 'slider', bottom: 8, height: 18, handleSize: '100%', start: x.length > 24 ? 100-(24/x.length*100) : 0 }],
-            series: [{ data: s, type: 'line', smooth: true, areaStyle: { color: 'rgba(25, 113, 194, 0.08)' }, itemStyle: { color: '#1971c2' } }]
+            title: { text: t, left: 'center' }, tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+            legend: { data: ['營收', 'YoY'], top: 30 }, grid: { top: 80, bottom: 85, left: 100, right: 85, containLabel: true },
+            xAxis: { type: 'category', data: x, axisLabel: { rotate: 45, interval: 'auto', margin: 15, fontSize: 11, align: 'right' } },
+            yAxis: [{ type: 'value', name: '營收(千元)', axisLabel: { formatter: v => v.toLocaleString() } }, { type: 'value', name: 'YoY (%)', axisLabel: { formatter: '{value}%' }, splitLine: { show: false } }],
+            dataZoom: [{ type: 'slider', bottom: 8, height: 18, start: x.length > 24 ? 100-(24/x.length*100) : 0 }],
+            series: [{ name: '營收', type: 'bar', data: s, itemStyle: { color: 'rgba(25, 113, 194, 0.7)' } }, { name: 'YoY', type: 'line', yAxisIndex: 1, data: yoy.map(v => v ? v.toFixed(2) : null), smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#e74c3c', width: 3 }, itemStyle: { color: '#e74c3c' } }]
         });
         window.addEventListener('resize', () => chart.resize());
     }
