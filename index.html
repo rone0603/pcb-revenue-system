@@ -10,15 +10,10 @@
     <style>
         :root { 
             --primary: #1971c2; 
-            --sub-sum-bg: #f1f3f5; 
-            --pcb-total-bg: #e7f5ff; 
-            --mat-total-bg: #f3f0ff; 
-            --eq-total-bg: #fff9db;  
+            --sub-sum-bg: #f1f3f5; /* 小類總和 (灰) */
+            --major-total-bg: #e7f5ff; /* 大類總結統一顏色 (藍) */
         }
-        body { 
-            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
-            padding: 15px; background: #f4f7f9; color: #333; margin: 0; 
-        }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; padding: 15px; background: #f4f7f9; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
         
         header { display: flex; flex-direction: column; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
@@ -32,35 +27,30 @@
         .tab-btn.active { background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--primary); font-weight: bold; }
 
         select { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; background: #fff; cursor: pointer; }
-        
-        /* 🌟 表格版位校正 */
-        .table-area { overflow-x: auto; max-height: 600px; border: 1px solid #eee; border-radius: 4px; }
-        table { 
-            width: 100%; border-collapse: collapse; font-size: 0.95rem; 
-            min-width: 1200px; table-layout: auto; /* 🌟 改回自動寬度防止擠壓 */
-        }
-        th { 
-            background: #f8f9fa; position: sticky; top: 0; z-index: 10; 
-            padding: 15px 10px; border: 1px solid #eee; white-space: nowrap; 
-        }
-        td { 
-            padding: 10px 15px; border: 1px solid #eee; text-align: center; 
-            white-space: nowrap; /* 🌟 防止文字換行造成排版混亂 */
-        }
 
-        /* 🌟 數字單元格極致對齊 */
+        /* 表格對齊與數字美化 */
+        .table-area { overflow-x: auto; max-height: 600px; border: 1px solid #eee; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 1200px; table-layout: auto; }
+        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; padding: 15px 10px; border: 1px solid #eee; white-space: nowrap; }
+        td { padding: 10px 15px; border: 1px solid #eee; text-align: center; white-space: nowrap; }
+
+        /* 🌟 數字與百分比欄位：強制等寬字型並右對齊 */
         .num-cell { 
             text-align: right !important; 
-            font-family: 'JetBrains Mono', monospace !important; /* 🌟 使用專用等寬字型 */
-            font-weight: 500;
-            letter-spacing: -0.5px;
-            padding-right: 30px !important; /* 🌟 統一右邊距 */
+            font-family: 'JetBrains Mono', monospace !important; 
+            padding-right: 30px !important; 
+            font-variant-numeric: tabular-nums;
         }
         
+        /* 🌟 灰底小類總和 */
         .sum-row { background-color: var(--sub-sum-bg) !important; font-weight: bold; }
-        .total-pcb { background-color: var(--pcb-total-bg) !important; font-weight: bold; border-top: 2px solid #339af0 !important; }
-        .total-mat { background-color: var(--mat-total-bg) !important; font-weight: bold; border-top: 2px solid #845ef7 !important; }
-        .total-eq { background-color: var(--eq-total-bg) !important; font-weight: bold; border-top: 2px solid #fcc419 !important; }
+        
+        /* 🌟 藍底大類總結 (統一顏色) */
+        .major-total-row { 
+            background-color: var(--major-total-bg) !important; 
+            font-weight: bold; 
+            border-top: 2px solid var(--primary) !important; 
+        }
 
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #2ecc71; font-weight: bold; }
@@ -120,7 +110,9 @@
     let mode = 'trend';
 
     const sortWeight = {
-        "硬板": 1, "軟板": 2, "玻纖": 1, "銅箔": 2, "CCL": 3, "FCCL": 4, "原物料相關": 5, "設備": 1
+        "硬板": 1, "軟板": 2,
+        "玻纖": 1, "銅箔": 2, "CCL": 3, "FCCL": 4, "原物料相關": 5,
+        "設備": 1
     };
 
     function parseD(s) {
@@ -239,6 +231,7 @@
         draw(comp==='ALL'?cat+'整體趨勢':comp, d.map(i=>i.date), d.map(i=>i.rev), d.map(i=>i.yoy));
     }
 
+    // 🌟 核心升級：智慧彙總邏輯
     function renderCross(cat, targetDate) {
         let [y, m] = targetDate.split('-'), targetMonthInt = parseInt(m);
         let items = rawStore.filter(r => r.date === targetDate && compsByCat[cat][r.name]);
@@ -267,19 +260,42 @@
 
         const rows = [];
         items.forEach((i, idx) => rows.push({ ...i, idx: idx+1, acc: accData[i.name].acc, accYoy: accData[i.name].lastAcc ? (accData[i.name].acc-accData[i.name].lastAcc)/accData[i.name].lastAcc*100 : null, cls: '' }));
-        Object.keys(subSums).sort((a,b) => (sortWeight[a]||99)-(sortWeight[b]||99)).forEach(t => {
-            if (t === '設備' && cat === '設備') return;
-            rows.push({ name: t+'總和', type:'', rev: subSums[t].rev, mom: subSums[t].prevM ? (subSums[t].rev-subSums[t].prevM)/subSums[t].prevM*100 : null, yoy: subSums[t].prevY ? (subSums[t].rev-subSums[t].prevY)/subSums[t].prevY*100 : null, acc: subSums[t].acc, accYoy: subSums[t].lastAcc ? (subSums[t].acc-subSums[t].lastAcc)/subSums[t].lastAcc*100 : null, idx: '', cls: 'sum-row' });
+        
+        // 🌟 智慧判斷：子類數量
+        const subTypeList = Object.keys(subSums);
+        const hasMultipleSubtypes = subTypeList.length > 1;
+
+        subTypeList.sort((a,b) => (sortWeight[a]||99)-(sortWeight[b]||99)).forEach(t => {
+            // 🌟 邏輯：只有在大類下有多個子類時，才顯示灰底小類總和
+            if (hasMultipleSubtypes) {
+                rows.push({ 
+                    name: t+'總和', type:'', rev: subSums[t].rev, 
+                    mom: subSums[t].prevM ? (subSums[t].rev-subSums[t].prevM)/subSums[t].prevM*100 : null, 
+                    yoy: subSums[t].prevY ? (subSums[t].rev-subSums[t].prevY)/subSums[t].prevY*100 : null, 
+                    acc: subSums[t].acc, 
+                    accYoy: subSums[t].lastAcc ? (subSums[t].acc-subSums[t].lastAcc)/subSums[t].lastAcc*100 : null, 
+                    idx: '', cls: 'sum-row' 
+                });
+            }
         });
-        rows.push({ name: cat+'總和', type:'', rev: majorSum.rev, mom: majorSum.prevM ? (majorSum.rev-majorSum.prevM)/majorSum.prevM*100 : null, yoy: majorSum.prevY ? (majorSum.rev-majorSum.prevY)/majorSum.prevY*100 : null, acc: majorSum.acc, accYoy: majorSum.lastAcc ? (majorSum.acc-majorSum.lastAcc)/majorSum.lastAcc*100 : null, idx: '', cls: cat==='PCB'?'total-pcb':(cat==='原物料'?'total-mat':'total-eq') });
+
+        // 🌟 大類總結：統一藍底
+        rows.push({ 
+            name: cat+'總和', type:'', rev: majorSum.rev, 
+            mom: majorSum.prevM ? (majorSum.rev-majorSum.prevM)/majorSum.prevM*100 : null, 
+            yoy: majorSum.prevY ? (majorSum.rev-majorSum.prevY)/majorSum.prevY*100 : null, 
+            acc: majorSum.acc, 
+            accYoy: majorSum.lastAcc ? (majorSum.acc-majorSum.lastAcc)/majorSum.lastAcc*100 : null, 
+            idx: '', cls: 'major-total-row' 
+        });
 
         fillTable(['序', '公司名稱', '類型', '營收(千元新台幣)', 'MoM', 'YoY', '累積營收(千元新台幣)', '累收YoY'], rows, r => `
-            <td>${r.idx}</td><td>${r.name}</td><td>${r.type}</td>
-            <td class="num-cell">${Math.round(r.rev).toLocaleString()}</td>
-            <td class="num-cell">${fPct(r.mom)}</td>
-            <td class="num-cell">${fPct(r.yoy)}</td>
-            <td class="num-cell">${Math.round(r.acc).toLocaleString()}</td>
-            <td class="num-cell">${fPct(r.accYoy)}</td>
+            <td class="${r.cls}">${r.idx}</td><td class="${r.cls}">${r.name}</td><td class="${r.cls}">${r.type}</td>
+            <td class="${r.cls} num-cell">${Math.round(r.rev).toLocaleString()}</td>
+            <td class="${r.cls} num-cell">${fPct(r.mom)}</td>
+            <td class="${r.cls} num-cell">${fPct(r.yoy)}</td>
+            <td class="${r.cls} num-cell">${Math.round(r.acc).toLocaleString()}</td>
+            <td class="${r.cls} num-cell">${fPct(r.accYoy)}</td>
         `);
     }
 
@@ -300,7 +316,6 @@
             dataZoom: [{ type: 'slider', bottom: 8, height: 18, start: x.length > 24 ? 100-(24/x.length*100) : 0 }],
             series: [{ name: '營收', type: 'bar', data: s, itemStyle: { color: 'rgba(25, 113, 194, 0.7)' } }, { name: 'YoY', type: 'line', yAxisIndex: 1, data: yoy.map(v => v ? v.toFixed(2) : null), smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#e74c3c', width: 3 }, itemStyle: { color: '#e74c3c' } }]
         });
-        window.addEventListener('resize', () => chart.resize());
     }
 </script>
 </body>
